@@ -9,8 +9,7 @@ from moneyfx.models import ExchangeRate
 
 class CurrencyExchangeService:
     def get_rates(self, date, source=conf.SOURCE_ECB):
-        if date is None:
-            cache_key_rates = 'exchange_rates'
+        cache_key_rates = 'exchange_rates'
         cache_key_version = str(date) + '_' + str(source)
         cached_rates = cache.get(cache_key_rates, version=cache_key_version)
         if cached_rates:

@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from django.core.cache import cache
 from decimal import Decimal
@@ -12,11 +13,13 @@ class CurrencyExchangeService:
         cache_key_rates = 'exchange_rates'
         cache_key_version = str(date) + '_' + str(source)
         cached_rates = cache.get(cache_key_rates, version=cache_key_version)
+
         if cached_rates:
             rates = cached_rates
         else:
-            rates = ExchangeRate.objects.filter(validity_date=date, source=source).first()
-            cache.set(cache_key_rates, rates, timeout=2592000, version=cache_key_version)
+            rates = ExchangeRate.objects.get_rates(date, source)
+            cache.set(cache_key_rates, rates, timeout=2592000, version=cache_key_version)  # timeout 30 days
+
         return rates
 
     def get_rate(self, rates, currency):
@@ -61,3 +64,11 @@ class CurrencyExchangeService:
         currency_sources = conf.CURRENCY_RATE_SOURCES
         return list(currency_sources.keys())[list(conf.CURRENCY_RATE_SOURCES.values()).index(rate_source)] \
             if rate_source else None
+
+    def get_rate_source(self, country, only_available=False):
+        rate_source = conf.NATIONAL_BANKS.get(country, conf.SOURCE_ECB)
+
+        if only_available:
+            return rate_source if rate_source in conf.AVAILABLE_RATE_SOURCES else conf.SOURCE_ECB
+        else:
+            return rate_source

@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from moneyfx import conf
+from moneyfx.querysets import ExchangeRateQuerySet
 
 
 class ExchangeRate(models.Model):
@@ -52,9 +53,13 @@ class ExchangeRate(models.Model):
     created = models.DateTimeField(_('created'), auto_now_add=True)
     modified = models.DateTimeField(_('modified'), auto_now=True)
 
+    objects = ExchangeRateQuerySet.as_manager()
+
     class Meta:
         verbose_name = _('Exchange Rate')
         verbose_name_plural = _('Exchange Rates')
+
+        get_latest_by = 'validity_date'
         unique_together = ('validity_date', 'source')
 
     def __str__(self):

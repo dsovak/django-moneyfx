@@ -9,6 +9,12 @@ from moneyfx.models import ExchangeRate
 
 
 class CurrencyExchangeService:
+    def _get_effective_currency(self, currency, date):
+        replacement_date = conf.EUROZONE_REPLACEMENTS.get(currency.upper())
+        if replacement_date and date >= replacement_date:
+            return 'EUR'
+        return currency
+
     def get_rates(self, date, source=conf.SOURCE_ECB):
         cache_key_rates = 'exchange_rates'
         cache_key_version = str(date) + '_' + str(source)
@@ -40,17 +46,23 @@ class CurrencyExchangeService:
             date = date if date else datetime.now().date()
             rates = self.get_rates(date, source)
         base_source_currency = self.get_source_currency(source)
-        # direct conversion
-        if base_source_currency in [currency_from, currency_to]:
-            currency_for_rate = currency_from if currency_from != base_source_currency else currency_to
+
+        effective_currency_from = self._get_effective_currency(currency_from, rates.validity_date)
+        effective_currency_to = self._get_effective_currency(currency_to, rates.validity_date)
+
+        if effective_currency_from.upper() == effective_currency_to.upper():
+            return Money(money.amount, currency_to)
+
+        if base_source_currency in [effective_currency_from, effective_currency_to]:
+            currency_for_rate = effective_currency_from if effective_currency_from != base_source_currency else effective_currency_to
             rate = self.get_rate(rates, currency_for_rate) if not rate else rate
             rate = rate / rates.get_currency_amount(currency_for_rate)
             # rate from base source currency
-            if currency_from == base_source_currency:
+            if effective_currency_from == base_source_currency:
                 if not rates.fixed_base_currency:
                     rate = (1 / rate)
             # rate to base source currency
-            elif currency_to == base_source_currency:
+            elif effective_currency_to == base_source_currency:
                 if rates.fixed_base_currency:
                     rate = (1 / rate)
             amount = Decimal(money.amount) * Decimal(rate)

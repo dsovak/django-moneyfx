@@ -1,5 +1,6 @@
 import os
 import django
+from datetime import date
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'moneyfx.tests.settings'
 django.setup()
@@ -100,6 +101,7 @@ class TestCurrencyConverterService(TestCase):
             c_ron = Decimal('4.806')
             c_huf = Decimal('6.144')
             c_huf_amount = 100
+            validity_date = date(2025, 12, 31)
             def get_currency_amount(self, currency):
                 return 1
         return Rates()
@@ -113,6 +115,9 @@ class TestCurrencyConverterService(TestCase):
             c_czk = Decimal('23.658')
             c_huf = Decimal('384.75')
             c_ron = Decimal('4.923')
+            c_bgn = Decimal('1.95583')
+            c_hrk = Decimal('7.5345')
+            validity_date = date(2021, 12, 31)
             def get_currency_amount(self, currency):
                 return 1
         return Rates()
@@ -127,6 +132,88 @@ class TestCurrencyConverterService(TestCase):
             c_czk = Decimal('0.1954')
             c_pln = Decimal('1')
             c_huf_amount = 100
+            validity_date = date(2025, 12, 31)
             def get_currency_amount(self, currency):
                 return 1
         return Rates()
+
+    # EUROZONE REPLACEMENT TESTS - BGN (Bulgaria adopted EUR on 2026-01-01)
+    def test_ECB_source_BGN_to_EUR_after_replacement(self):
+        """BGN should be treated as EUR (1:1) after 2026-01-01"""
+        rates = self.get_euro_ECB_rates_after_bgn_replacement()
+        converted_money = self.convert(1000, 'BGN', 'EUR', rates, self.source_ECB)
+        self.assert_money(self.money_to_str(converted_money), 'EUR1000.00')
+
+    def test_ECB_source_BGN_to_EUR_before_replacement(self):
+        """BGN should use historical rate before 2026-01-01"""
+        converted_money = self.convert(1000, 'BGN', 'EUR', self.rates_ECB, self.source_ECB)
+        self.assert_money(self.money_to_str(converted_money), 'EUR511.29')
+
+    def test_ECB_source_EUR_to_BGN_after_replacement(self):
+        """EUR to BGN should be 1:1 after 2026-01-01"""
+        rates = self.get_euro_ECB_rates_after_bgn_replacement()
+        converted_money = self.convert(1000, 'EUR', 'BGN', rates, self.source_ECB)
+        self.assert_money(self.money_to_str(converted_money), 'BGN1000.00')
+
+    def test_ECB_source_BGN_to_CZK_after_replacement(self):
+        """BGN to CZK after replacement: BGN treated as EUR, then converted to CZK"""
+        rates = self.get_euro_ECB_rates_after_bgn_replacement()
+        converted_money = self.convert(100, 'BGN', 'CZK', rates, self.source_ECB)
+        self.assert_money(self.money_to_str(converted_money), 'CZK2365.80')
+
+    def test_ECB_source_CZK_to_BGN_after_replacement(self):
+        """CZK to BGN after replacement: CZK to EUR, then EUR treated as BGN"""
+        rates = self.get_euro_ECB_rates_after_bgn_replacement()
+        converted_money = self.convert(2365.80, 'CZK', 'BGN', rates, self.source_ECB)
+        self.assert_money(self.money_to_str(converted_money), 'BGN100.00')
+
+    def test_ECB_source_BGN_to_BGN_after_replacement(self):
+        """BGN to BGN after replacement should return same amount"""
+        rates = self.get_euro_ECB_rates_after_bgn_replacement()
+        converted_money = self.convert(1000, 'BGN', 'BGN', rates, self.source_ECB)
+        self.assert_money(self.money_to_str(converted_money), 'BGN1000.00')
+
+    # EUROZONE REPLACEMENT TESTS - HRK (Croatia adopted EUR on 2023-01-01)
+    def test_ECB_source_HRK_to_EUR_after_replacement(self):
+        """HRK should be treated as EUR (1:1) after 2023-01-01"""
+        rates = self.get_euro_ECB_rates_after_hrk_replacement()
+        converted_money = self.convert(1000, 'HRK', 'EUR', rates, self.source_ECB)
+        self.assert_money(self.money_to_str(converted_money), 'EUR1000.00')
+
+    def test_ECB_source_HRK_to_EUR_before_replacement(self):
+        """HRK should use historical rate before 2023-01-01"""
+        converted_money = self.convert(1000, 'HRK', 'EUR', self.rates_ECB, self.source_ECB)
+        self.assert_money(self.money_to_str(converted_money), 'EUR132.72')
+
+    # Helper methods for eurozone replacement rates
+    def get_euro_ECB_rates_after_bgn_replacement(self):
+        """ECB rates after BGN replacement (2026-01-01 or later)"""
+        class Rates:
+            source = 'ECB'
+            fixed_base_currency = True
+            c_eur = Decimal('1')
+            c_czk = Decimal('23.658')
+            c_huf = Decimal('384.75')
+            c_ron = Decimal('4.923')
+            # BGN rate is None after replacement
+            c_bgn = None
+            validity_date = date(2026, 1, 1)
+            def get_currency_amount(self, currency):
+                return 1
+        return Rates()
+
+
+    def get_euro_ECB_rates_after_hrk_replacement(self):
+        class Rates:
+            source = 'ECB'
+            fixed_base_currency = True
+            c_eur = Decimal('1')
+            c_czk = Decimal('23.658')
+            c_huf = Decimal('384.75')
+            c_ron = Decimal('4.923')
+            c_hrk = None
+            validity_date = date(2023, 1, 1)
+            def get_currency_amount(self, currency):
+                return 1
+        return Rates()
+
